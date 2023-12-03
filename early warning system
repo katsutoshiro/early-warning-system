@@ -1,0 +1,179 @@
+import requests
+from datetime import datetime
+
+def fetch_real_time_weather(api_key, location):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {"q": location, "appid": api_key, "units": "metric"}  # Units set to metric for Celsius
+
+    response = requests.get(base_url, params=params)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error fetching weather data: {response.status_code}")
+        return None
+
+def check_alert(weather_data):
+    if "main" in weather_data and "wind" in weather_data:
+        if "temp" in weather_data["main"] and "humidity" in weather_data["main"] and "speed" in weather_data["wind"]:
+            temperature = weather_data["main"]["temp"]
+            humidity = weather_data["main"]["humidity"]
+            wind_speed = weather_data["wind"]["speed"]
+
+            # Temperature, humidity, and wind speed thresholds
+            extreme_temp_threshold = 40
+            high_humidity_threshold = 80
+            high_wind_speed_threshold = 25
+
+            if temperature >= extreme_temp_threshold:
+                return True, f"Extreme High Temperature Alert! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \nPrepare for potential heat stress on plants."
+
+            elif humidity >= high_humidity_threshold:
+                return True, f"High Humidity Alert! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nWatch for potential fungal diseases; choose resistant plant varieties."
+
+            elif wind_speed >= high_wind_speed_threshold:
+                return True, f"High Wind Speed Alert! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nSecure tall plants and structures to prevent damage."
+
+            elif 7 <= temperature <= 24:  # 45°F to 75°F
+                return False, f"Ideal weather conditions! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nConsider planting cool-season vegetables like Lettuce, Spinach, Broccoli, and Cauliflower."
+
+            elif 21 <= temperature <= 35:  # 70°F to 95°F
+                return False, f"Ideal weather conditions! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nConsider planting warm-season vegetables like Tomatoes, Peppers, Cucumbers, and Beans."
+
+            elif 24 <= temperature <= 35:  # 75°F to 95°F
+                return False, f"Ideal weather conditions! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nConsider planting tropical fruits like Bananas, Mangoes, and Pineapples."
+
+            elif 10 <= temperature <= 29:  # 50°F to 85°F
+                return False, f"Ideal weather conditions! \nTemperature: {temperature:.2f}°C, Humidity: {humidity}%, Wind Speed: {wind_speed} m/s. \n\nConsider planting root vegetables like Carrots, Radishes, and Potatoes."
+
+    return False, None
+
+def fetch_weather_data(api_key, location, option, forecast_dates=None):
+    base_url = "http://api.openweathermap.org/data/2.5/forecast"
+    params = {"q": location, "appid": api_key, "cnt": 40} 
+
+    response = requests.get(base_url, params=params)
+
+    if response.status_code == 200:
+        return response.json(), option
+    else:
+        print(f"Error fetching weather data: {response.status_code}")
+        return None, None
+
+def kelvin_to_celsius(kelvin_temp):
+    return kelvin_temp - 273.15
+
+def get_plant_recommendation(temperature):
+    if 7 <= temperature < 21:
+        return "Cool-season Vegetables: asparagus, beets, broccoli, Brussels"
+    elif 21 <= temperature < 24:
+        return "Warm-season Vegetables: beans, corn, cucumbers, eggplant, melons; Cereals: wheat, barley, oats, rye"
+    elif 24 <= temperature < 35:
+        return "Tropical Fruits: banana, mango, pineapple"
+    elif 10 <= temperature <= 29:
+        return "Root Vegetables: potato, carrot, beet"
+    else:
+        return "Plant recommendations not available for this temperature range."
+
+def get_crop_info_by_location(api_key):
+    # User input for location
+    country = input("\nEnter the country: ")
+    state = input("Enter the state: ")
+    city = input("Enter the city: ")
+
+    location_name = f"{city},{state},{country}"
+
+    # Fetch weather data
+    real_time_weather_data = fetch_real_time_weather(api_key, location_name)
+
+    if real_time_weather_data:
+        alert, alert_message = check_alert(real_time_weather_data)
+        if alert:
+            print(f"\nALERT: {alert_message}")
+            temperature = real_time_weather_data["main"]["temp"]
+            plant_recommendation = get_plant_recommendation(temperature)
+            print(f"\nPlant Recommendation:\n{plant_recommendation}")
+        else:
+            print(f"INFO: {alert_message}")
+    else:
+        print("Unable to fetch real-time weather data. Please check your input.")
+
+# ... (previous code)
+
+def get_check_weather(api_key):
+    # User input for location
+    country = input("\nEnter the country: ")
+    state = input("Enter the state: ")
+    city = input("Enter the city: ")
+    
+    location_name = f"{city},{state},{country}"
+
+    # User input for option
+    options = {'1': 'current', '2': 'past', '3': 'forecast'}
+    option = input(f"\nChoose an option:\n1. Current Weather\n2. Previous Weather\n3. Future weather\nEnter the corresponding number: ")
+
+    selected_option = options.get(option)
+    if selected_option is None:
+        print("Invalid option. Please choose a valid number (1, 2, or 3).")
+    else:
+        # Fetch weather data
+        location_data, selected_option = fetch_weather_data(api_key, location_name, selected_option)
+        
+        if location_data:
+            latitude = location_data.get("city", {}).get("coord", {}).get("lat", 0)
+            longitude = location_data.get("city", {}).get("coord", {}).get("lon", 0)
+            location = {"lat": latitude, "lon": longitude}
+            
+            # Display the weather
+            if selected_option == "current":
+                print("\nCurrent Weather Data:")
+                main_data = location_data.get('list', [{}])[0].get('main', {})
+                temperature = kelvin_to_celsius(main_data.get('temp', 0))
+                humidity = main_data.get('humidity', 0)
+                weather_description = location_data.get('list', [{}])[0].get('weather', [{}])[0].get('description', 'N/A')
+                wind_speed = location_data.get('list', [{}])[0].get('wind', {}).get('speed', 0)
+                
+                print(f"Temperature: {temperature:.2f}°C")
+                print(f"Humidity: {humidity}%")
+                print(f"Weather Description: {weather_description}")
+                print(f"Wind Speed: {wind_speed} m/s")
+            elif selected_option == "past":
+                print("\nNo weather data available for past dates due to limited in the free version of the API Weather.")
+            elif selected_option == "forecast":
+                forecast_dates_input = input("\nEnter forecast dates (DD-MM-YYYY): ")
+                forecast_dates = forecast_dates_input.split(',')
+                
+                print(f"\nWeather Forecast for {location_name} :")
+                for forecast_date in forecast_dates:
+                    forecast_date = datetime.strptime(forecast_date.strip(), "%d-%m-%Y")
+                    forecast_data = [item for item in location_data.get('list', []) if datetime.utcfromtimestamp(item.get('dt')).date() == forecast_date.date()]
+                    
+                    if forecast_data:
+                        print(f"\nForecast for {forecast_date.strftime('%d-%m-%Y')}:")
+                        for item in forecast_data:
+                            time = datetime.utcfromtimestamp(item.get('dt')).strftime('%H:%M:%S')
+                            temperature = kelvin_to_celsius(item.get('main', {}).get('temp', 0))
+                            humidity = item.get('main', {}).get('humidity', 0)
+                            weather_description = item.get('weather', [{}])[0].get('description', 'N/A')
+                            wind_speed = item.get('wind', {}).get('speed', 0)
+
+                            print(f"\nTime: {time} Temperature: {temperature:.2f}°C \nHumidity: {humidity}% \nWind Speed: {wind_speed} \nWeather Description: {weather_description}, m/s")
+                            print("-" * 30)
+                    else:
+                        print(f"No weather data available for {forecast_date.strftime('%d-%m-%Y')}")
+                        print("Notes: Forecast date is limited in the free version of the API Weather ")
+
+if __name__ == "__main__":
+    api_key = "f8c5765df23fb9f412720288d4442ef6"
+
+    user_choice = input("Choose an option:\n1. Check Weather\n2. Planting Precision\nEnter the corresponding number: ")
+
+    if user_choice == "1":
+        # Call the function to check weather
+        get_check_weather(api_key)
+
+    elif user_choice == "2":
+        # Call the function to get crop information by location
+        get_crop_info_by_location(api_key)
+    else:
+        print("Invalid option. Please choose a valid number (1 or 2).")
